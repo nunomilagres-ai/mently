@@ -73,7 +73,7 @@ async function fetchWesternHoroscope(signPT, period) {
     )
     if (!res.ok) return null
     const data = await res.json()
-    return data?.data?.horoscope_data ?? null
+    return data?.data?.horoscope ?? data?.data?.horoscope_data ?? null
   } catch {
     return null // falha silenciosa — Claude gera sem fonte externa
   }
