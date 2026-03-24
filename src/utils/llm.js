@@ -20,7 +20,7 @@ export async function callClaude({ system, user, maxTokens = 800 }) {
       'x-api-key': apiKey,
     },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5',
+      model: 'claude-3-5-haiku-20241022',
       max_tokens: maxTokens,
       system,
       messages: [{ role: 'user', content: user }],
