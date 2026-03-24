@@ -5,7 +5,7 @@ compatibility_date     = "2024-09-23"
 [[d1_databases]]
 binding       = "DB"
 database_name = "mently-db"
-database_id   = "SUBSTITUIR_APOS_CRIAR_D1"
+database_id   = "269a3213-4328-4b9a-a13f-ee501f36006b"
 
 [vars]
 APP_URL = "https://mently.bynuno.com"
