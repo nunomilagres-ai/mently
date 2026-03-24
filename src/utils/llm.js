@@ -36,7 +36,50 @@ export async function callClaude({ system, user, maxTokens = 800 }) {
   return data.content?.[0]?.text ?? ''
 }
 
-// ─── Generate horoscope via Claude ───────────────────────────────────────────
+// ─── Mapeamento signo PT → EN para API externa ────────────────────────────────
+const SIGN_EN = {
+  'Áries':       'aries',
+  'Touro':       'taurus',
+  'Gémeos':      'gemini',
+  'Caranguejo':  'cancer',
+  'Leão':        'leo',
+  'Virgem':      'virgo',
+  'Balança':     'libra',
+  'Escorpião':   'scorpio',
+  'Sagitário':   'sagittarius',
+  'Capricórnio': 'capricorn',
+  'Aquário':     'aquarius',
+  'Peixes':      'pisces',
+}
+
+const PERIOD_EN = {
+  dia:    'daily',
+  semana: 'weekly',
+  mes:    'monthly',
+}
+
+// ─── Buscar horóscopo ocidental de fonte externa ──────────────────────────────
+async function fetchWesternHoroscope(signPT, period) {
+  const signEN   = SIGN_EN[signPT]
+  const periodEN = PERIOD_EN[period]
+
+  // Horóscopo anual: API não suporta — Claude gera directamente
+  if (!signEN || !periodEN) return null
+
+  try {
+    const res = await fetch(
+      `https://horoscope-app-api.vercel.app/api/v1/get-horoscope/${periodEN}?sign=${signEN}&day=TODAY`,
+      { signal: AbortSignal.timeout(5000) }
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    return data?.data?.horoscope_data ?? null
+  } catch {
+    return null // falha silenciosa — Claude gera sem fonte externa
+  }
+}
+
+// ─── Generate horoscope via Claude (com fonte ocidental externa) ──────────────
 export async function generateHoroscope({ western, chinese, period, birthDate, age, sex }) {
   const periodPT = { dia: 'diário', semana: 'semanal', mes: 'mensal', ano: 'anual' }[period] ?? 'diário'
   const periodContext = {
@@ -46,16 +89,27 @@ export async function generateHoroscope({ western, chinese, period, birthDate, a
     ano:    'para este ano, com as grandes tendências e ciclos em curso',
   }[period] ?? 'para hoje'
 
-  const system = `És um astrólogo experiente e reflexivo. Escreves em português europeu (não brasileiro), com um tom cuidado, inspirador e honesto — nunca vago nem excessivamente positivo. Conheces em profundidade a astrologia ocidental e o zodíaco chinês, e sabes integrar as duas tradições numa leitura coerente. Respondes sempre em JSON válido, sem texto fora do JSON.`
+  // Tentar obter horóscopo ocidental de fonte externa
+  const westernExternal = await fetchWesternHoroscope(western.sign, period)
+
+  const system = `És um astrólogo experiente que domina tanto a astrologia ocidental como o zodíaco chinês. Escreves em português europeu, com um tom reflexivo, concreto e honesto — nunca vago nem excessivamente positivo. O teu papel é reconciliar e sintetizar as duas tradições numa leitura única e coerente. Respondes sempre em JSON válido, sem texto fora do JSON.`
+
+  const westernSource = westernExternal
+    ? `Horóscopo ocidental de fonte externa para ${western.sign} (${periodPT}):\n"${westernExternal}"`
+    : `Signo ocidental: ${western.sign} (elemento ${western.element}, regido por ${western.ruling})`
 
   const user = `Gera um horóscopo ${periodPT} ${periodContext} para esta pessoa:
 
-- Signo ocidental: ${western.sign} (elemento ${western.element}, regido por ${western.ruling})
-- Signo chinês: ${chinese.sign} (${chinese.emoji})
-- Idade: ${age ?? 'desconhecida'} anos
-- Sexo: ${sex === 'female' ? 'feminino' : 'masculino'}
+${westernSource}
 
-A combinação ${western.sign} + ${chinese.sign} é única — integra os dois arquétipos na leitura de forma orgânica, sem os tratar separadamente.
+Signo chinês: ${chinese.sign} ${chinese.emoji}
+Idade: ${age ?? 'desconhecida'} anos
+Sexo: ${sex === 'female' ? 'feminino' : 'masculino'}
+
+${westernExternal
+  ? `A tua tarefa: com base no horóscopo ocidental acima (fonte externa), adiciona a perspectiva do zodíaco chinês para o ${chinese.sign} e reconcilia as duas tradições numa leitura unificada e personalizada. Não copies o texto original — sintetiza e enriquece.`
+  : `A tua tarefa: integra as duas tradições astrológicas numa leitura coerente e personalizada para ${western.sign} + ${chinese.sign}.`
+}
 
 Devolve exactamente este JSON (sem markdown, sem texto antes ou depois):
 {
@@ -66,12 +120,12 @@ Devolve exactamente este JSON (sem markdown, sem texto antes ou depois):
   "energia": <número inteiro 1 a 5>,
   "cor": "<cor sortuda em português>",
   "numero": <número inteiro 1 a 9>,
-  "frase": "<uma frase curta e memorável que resume o período>"
+  "frase": "<uma frase curta e memorável que resume o período>",
+  "fonte": ${westernExternal ? '"Horóscopo ocidental: horoscope-app-api.vercel.app · Perspectiva chinesa e síntese: Claude (Anthropic)"' : '"Gerado por Claude (Anthropic) com base nas duas tradições astrológicas"'}
 }`
 
-  const raw = await callClaude({ system, user, maxTokens: 900 })
+  const raw = await callClaude({ system, user, maxTokens: 1000 })
 
-  // Parse JSON — robust (strip markdown fences if present)
   const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
   try {
     return JSON.parse(cleaned)

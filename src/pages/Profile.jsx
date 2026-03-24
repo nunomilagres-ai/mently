@@ -221,7 +221,7 @@ function HoroscopeSection({ western, chinese, profile }) {
       {loading && (
         <div className="bg-white rounded-2xl p-8 shadow-sm flex flex-col items-center gap-3 text-gray-400">
           <RefreshCw size={24} className="animate-spin text-brand-400" />
-          <p className="text-sm">A gerar horóscopo com Claude…</p>
+          <p className="text-sm">A consultar fontes e reconciliar com Claude…</p>
         </div>
       )}
 
@@ -291,7 +291,9 @@ function HoroscopeSection({ western, chinese, profile }) {
           {/* Source note */}
           <div className="bg-gray-50 rounded-2xl px-4 py-3 border border-gray-100">
             <p className="text-[11px] text-gray-400 leading-relaxed">
-              <strong className="text-gray-500">Fonte:</strong> Horóscopo gerado pelo modelo Claude (Anthropic) com base nos teus signos e na data actual. As descrições dos signos seguem as tradições da astrologia ocidental e do zodíaco chinês clássico. Deve ser lido como reflexão pessoal, não como previsão.
+              <strong className="text-gray-500">Fonte:</strong>{' '}
+              {horo.fonte ?? 'Gerado por Claude (Anthropic) com base nas duas tradições astrológicas.'}
+              {' '}Deve ser lido como reflexão pessoal, não como previsão.
             </p>
             <button onClick={() => { saveApiKey(''); setHasKey(false) }}
               className="mt-1.5 text-[11px] text-gray-400 underline underline-offset-2">
