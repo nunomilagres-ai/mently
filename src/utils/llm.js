@@ -58,7 +58,7 @@ const PERIOD_EN = {
   mes:    'monthly',
 }
 
-// ─── Buscar horóscopo ocidental de fonte externa ──────────────────────────────
+// ─── Buscar horóscopo ocidental via proxy local (sem CORS) ───────────────────
 async function fetchWesternHoroscope(signPT, period) {
   const signEN   = SIGN_EN[signPT]
   const periodEN = PERIOD_EN[period]
@@ -68,12 +68,12 @@ async function fetchWesternHoroscope(signPT, period) {
 
   try {
     const res = await fetch(
-      `https://horoscope-app-api.vercel.app/api/v1/get-horoscope/${periodEN}?sign=${signEN}&day=TODAY`,
-      { signal: AbortSignal.timeout(5000) }
+      `/api/horoscope?sign=${signEN}&period=${periodEN}`,
+      { signal: AbortSignal.timeout(8000) }
     )
     if (!res.ok) return null
     const data = await res.json()
-    return data?.data?.horoscope ?? data?.data?.horoscope_data ?? null
+    return data?.horoscope ?? null
   } catch {
     return null // falha silenciosa — Claude gera sem fonte externa
   }
