@@ -326,14 +326,16 @@ export default function Profile() {
   const [tab, setTab]             = useState('perfil') // 'perfil' | 'horoscopo'
 
   useEffect(() => {
-    const p = profileStore.get()
-    if (p) setProfile({ ...EMPTY, ...p })
-    const w = weightStore.list()
-    if (w.length > 0) setLastWeight(w[0])
+    async function init() {
+      const [p, w] = await Promise.all([profileStore.get(), weightStore.list()])
+      if (p) setProfile({ ...EMPTY, ...p })
+      if (w.length > 0) setLastWeight(w[0])
+    }
+    init()
   }, [])
 
-  function save() {
-    profileStore.save({ ...profile, heightCm: profile.heightCm ? parseFloat(profile.heightCm) : null })
+  async function save() {
+    await profileStore.save({ ...profile, heightCm: profile.heightCm ? parseFloat(profile.heightCm) : null })
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }

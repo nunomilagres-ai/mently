@@ -1,0 +1,11 @@
+name                   = "mently"
+pages_build_output_dir = "dist"
+compatibility_date     = "2024-09-23"
+
+[[d1_databases]]
+binding       = "DB"
+database_name = "mently-db"
+database_id   = "SUBSTITUIR_APOS_CRIAR_D1"
+
+[vars]
+APP_URL = "https://mently.bynuno.com"

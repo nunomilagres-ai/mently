@@ -8,9 +8,9 @@ export default function WeightModal({ entry, onClose, onSaved }) {
   const [date, setDate]         = useState(entry?.date ?? today)
   const [weight, setWeight]     = useState(entry?.weightKg ?? '')
 
-  function save() {
+  async function save() {
     if (!weight || !date) return
-    weightStore.save({ id: entry?.id ?? genNewId(), date, weightKg: parseFloat(weight) })
+    await weightStore.save({ id: entry?.id ?? genNewId(), date, weightKg: parseFloat(weight) })
     onSaved()
   }
 

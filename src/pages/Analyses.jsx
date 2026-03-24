@@ -242,7 +242,7 @@ function AddResultModal({ onClose, onSaved }) {
     setMarkers(ms => ms.filter((_, idx) => idx !== i))
   }
 
-  function save() {
+  async function save() {
     const clean = markers
       .filter(m => m.name && m.value)
       .map(m => ({
@@ -253,7 +253,7 @@ function AddResultModal({ onClose, onSaved }) {
         refMax: m.refMax !== '' ? parseFloat(m.refMax) : null,
       }))
     if (!title || !date || clean.length === 0) return
-    labStore.save({ id: genNewId(), title, date, source: 'manual', markers: clean })
+    await labStore.save({ id: genNewId(), title, date, source: 'manual', markers: clean })
     onSaved()
   }
 
@@ -365,8 +365,8 @@ export default function Analyses() {
   const [compareB, setCompareB]     = useState('')
   const [showCompare, setShowCompare] = useState(false)
 
-  function reload() { setResults(labStore.list()) }
-  useEffect(reload, [])
+  async function reload() { setResults(await labStore.list()) }
+  useEffect(() => { reload() }, [])
 
   const resultA = results.find(r => r.id === compareA)
   const resultB = results.find(r => r.id === compareB)
@@ -459,7 +459,7 @@ export default function Analyses() {
           <LabCard
             key={r.id}
             result={r}
-            onDelete={id => { labStore.delete(id); reload() }}
+            onDelete={async id => { await labStore.delete(id); await reload() }}
             compareResult={
               showCompare && compareA && compareB
                 ? (r.id === compareA ? resultB : r.id === compareB ? resultA : null)

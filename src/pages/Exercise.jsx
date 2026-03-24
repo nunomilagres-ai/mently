@@ -28,8 +28,8 @@ function ExerciseModal({ entry, onClose, onSaved }) {
     setSessions(s => s.map((sess, idx) => idx === i ? { ...sess, [key]: val } : sess))
   }
 
-  function save() {
-    exerciseStore.save({
+  async function save() {
+    await exerciseStore.save({
       id: entry?.id ?? genNewId(),
       date,
       steps: steps ? parseInt(steps) : 0,
@@ -123,8 +123,8 @@ export default function Exercise() {
   const [showAdd, setShowAdd] = useState(false)
   const [editing, setEditing] = useState(null)
 
-  function reload() { setEntries(exerciseStore.list()) }
-  useEffect(reload, [])
+  async function reload() { setEntries(await exerciseStore.list()) }
+  useEffect(() => { reload() }, [])
 
   const stepsData = [...entries].reverse().slice(-14).map(e => ({
     date: e.date, passos: e.steps ?? 0,
@@ -209,7 +209,7 @@ export default function Exercise() {
                     </span>
                   )}
                   <button
-                    onClick={ev => { ev.stopPropagation(); exerciseStore.delete(e.id); reload() }}
+                    onClick={async ev => { ev.stopPropagation(); await exerciseStore.delete(e.id); await reload() }}
                     className="text-gray-200 hover:text-red-400 p-1"
                   >
                     <Trash2 size={14} />

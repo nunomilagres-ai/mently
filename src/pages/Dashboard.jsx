@@ -56,12 +56,19 @@ export default function Dashboard() {
 
   const today = format(new Date(), 'yyyy-MM-dd')
 
-  function reload() {
-    setWeights(weightStore.list().slice(0, 7))
-    setSleep(sleepStore.byDate(today))
-    setExercise(exerciseStore.byDate(today))
-    setLabs(labStore.list().slice(0, 1))
-    setProfile(profileStore.get())
+  async function reload() {
+    const [weights, sleep, exercise, labs, profile] = await Promise.all([
+      weightStore.list(),
+      sleepStore.byDate(today),
+      exerciseStore.byDate(today),
+      labStore.list(),
+      profileStore.get(),
+    ])
+    setWeights(weights.slice(0, 7))
+    setSleep(sleep)
+    setExercise(exercise)
+    setLabs(labs.slice(0, 1))
+    setProfile(profile)
   }
 
   useEffect(() => { reload() }, [])

@@ -27,9 +27,9 @@ function SleepModal({ entry, onClose, onSaved }) {
 
   const hours = calcHours(bedtime, wakeTime)
 
-  function save() {
+  async function save() {
     if (!date || !bedtime || !wakeTime) return
-    sleepStore.save({ id: entry?.id ?? genNewId(), date, bedtime, wakeTime, hoursSlept: hours, notes })
+    await sleepStore.save({ id: entry?.id ?? genNewId(), date, bedtime, wakeTime, hoursSlept: hours, notes })
     onSaved()
   }
 
@@ -88,8 +88,8 @@ export default function Sleep() {
   const [showAdd, setShowAdd] = useState(false)
   const [editing, setEditing] = useState(null)
 
-  function reload() { setEntries(sleepStore.list()) }
-  useEffect(reload, [])
+  async function reload() { setEntries(await sleepStore.list()) }
+  useEffect(() => { reload() }, [])
 
   const chartData = [...entries].reverse().slice(-14).map(e => ({
     date: e.date,
@@ -172,7 +172,7 @@ export default function Sleep() {
                 {e.notes && <p className="text-xs text-gray-400 truncate italic mt-0.5">{e.notes}</p>}
               </div>
               <button
-                onClick={ev => { ev.stopPropagation(); sleepStore.delete(e.id); reload() }}
+                onClick={async ev => { ev.stopPropagation(); await sleepStore.delete(e.id); await reload() }}
                 className="text-gray-200 hover:text-red-400 p-1"
               >
                 <Trash2 size={14} />

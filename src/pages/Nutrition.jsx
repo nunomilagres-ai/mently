@@ -167,11 +167,12 @@ export default function Nutrition() {
   const [date, setDate]       = useState(format(new Date(), 'yyyy-MM-dd'))
   const [entry, setEntry]     = useState(null)
   const [addMeal, setAddMeal] = useState(null) // meal name string
-  const profile               = profileStore.get()
+  const [profile, setProfile] = useState(null)
   const rec                   = getRecommendedNutrition(profile)
 
-  function load(d) {
-    const e = nutritionStore.byDate(d)
+  async function load(d) {
+    const [e, p] = await Promise.all([nutritionStore.byDate(d), profileStore.get()])
+    setProfile(p)
     setEntry(e ?? {
       id: genNewId(), date: d,
       meals: DEFAULT_MEALS.map(name => ({ name, foods: [] }))
