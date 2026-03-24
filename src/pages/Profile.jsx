@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { pt } from 'date-fns/locale'
-import { User, Ruler, Calendar, Clock, Sparkles, Star, Heart, Briefcase, Activity, Zap } from 'lucide-react'
-import { profileStore, weightStore } from '@/store'
-import { getZodiac, getChineseZodiac, getAge, getCombinationInsight, getHoroscope } from '@/utils/horoscope'
+import { Ruler, Calendar, Clock, Sparkles, Star, Heart, Briefcase, Activity, RefreshCw, Key, Eye, EyeOff } from 'lucide-react'
+import { profileStore, weightStore, horoCache, buildHoroCacheKey } from '@/store'
+import { getZodiac, getChineseZodiac, getAge, getCombinationInsight } from '@/utils/horoscope'
+import { generateHoroscope, getApiKey, saveApiKey } from '@/utils/llm'
 import { cn } from '@/utils/cn'
 
 const EMPTY = { name: '', birthDate: '', birthTime: '', sex: 'male', heightCm: '' }
@@ -111,67 +112,194 @@ function CombinationCard({ western, chinese, insight }) {
   )
 }
 
-// ─── Horoscope section ────────────────────────────────────────────────────────
-function HoroscopeSection({ western, chinese }) {
-  const [period, setPeriod] = useState('dia')
-  const horo = getHoroscope(western, chinese, period)
+// ─── API Key modal ────────────────────────────────────────────────────────────
+function ApiKeySetup({ onSaved }) {
+  const [key, setKey]       = useState(getApiKey())
+  const [show, setShow]     = useState(false)
+  const [saved, setSaved]   = useState(false)
 
-  if (!horo) return null
+  function save() {
+    if (!key.trim()) return
+    saveApiKey(key)
+    setSaved(true)
+    setTimeout(() => { setSaved(false); onSaved() }, 800)
+  }
+
+  return (
+    <div className="bg-white rounded-2xl p-5 shadow-sm">
+      <div className="flex items-center gap-2 mb-3">
+        <Key size={16} className="text-brand-500" />
+        <p className="text-sm font-semibold text-gray-800">Chave Anthropic API</p>
+      </div>
+      <p className="text-xs text-gray-400 mb-4 leading-relaxed">
+        Para gerar horóscopos com Claude precisas da tua chave da Anthropic. Fica guardada localmente no dispositivo e nunca é enviada para nenhum servidor externo além do proxy da app.
+      </p>
+      <div className="relative">
+        <input
+          type={show ? 'text' : 'password'}
+          value={key}
+          onChange={e => setKey(e.target.value)}
+          placeholder="sk-ant-..."
+          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm pr-10 focus:outline-none focus:ring-2 focus:ring-brand-400 font-mono"
+        />
+        <button onClick={() => setShow(s => !s)}
+          className="absolute right-3 top-3.5 text-gray-300 hover:text-gray-500">
+          {show ? <EyeOff size={16} /> : <Eye size={16} />}
+        </button>
+      </div>
+      <button
+        onClick={save}
+        disabled={!key.trim()}
+        className={cn(
+          'mt-3 w-full rounded-xl py-3 text-sm font-semibold transition-all',
+          saved ? 'bg-green-500 text-white' : 'bg-brand-500 hover:bg-brand-600 disabled:bg-gray-200 disabled:text-gray-400 text-white'
+        )}
+      >
+        {saved ? '✓ Guardado' : 'Guardar chave'}
+      </button>
+    </div>
+  )
+}
+
+// ─── Horoscope section ────────────────────────────────────────────────────────
+function HoroscopeSection({ western, chinese, profile }) {
+  const [period, setPeriod]   = useState('dia')
+  const [horo, setHoro]       = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError]     = useState(null)
+  const [hasKey, setHasKey]   = useState(!!getApiKey())
 
   const periodLabel = { dia: 'de hoje', semana: 'desta semana', mes: 'deste mês', ano: 'deste ano' }
+
+  async function load(p, force = false) {
+    const cacheKey = buildHoroCacheKey(western.sign, chinese.sign, p)
+    if (!force) {
+      const cached = horoCache.get(cacheKey)
+      if (cached) { setHoro(cached); return }
+    }
+    setLoading(true)
+    setError(null)
+    setHoro(null)
+    try {
+      const result = await generateHoroscope({
+        western, chinese, period: p,
+        birthDate: profile?.birthDate,
+        age: getAge(profile?.birthDate),
+        sex: profile?.sex,
+      })
+      horoCache.set(cacheKey, result)
+      setHoro(result)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { if (hasKey) load(period) }, [period, hasKey])
+
+  if (!hasKey) {
+    return <ApiKeySetup onSaved={() => setHasKey(true)} />
+  }
 
   return (
     <div className="space-y-3">
       {/* Period tabs */}
       <div className="flex bg-white rounded-2xl shadow-sm p-1 gap-1">
         {PERIODS.map(p => (
-          <button
-            key={p.key}
-            onClick={() => setPeriod(p.key)}
+          <button key={p.key} onClick={() => setPeriod(p.key)}
             className={cn(
               'flex-1 py-2 rounded-xl text-sm font-medium transition-colors',
-              period === p.key
-                ? 'bg-brand-500 text-white'
-                : 'text-gray-400 hover:text-gray-600'
-            )}
-          >
+              period === p.key ? 'bg-brand-500 text-white' : 'text-gray-400 hover:text-gray-600'
+            )}>
             {p.label}
           </button>
         ))}
       </div>
 
-      {/* Header */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Horóscopo {periodLabel[period]}</p>
-            <p className="text-sm font-semibold text-gray-800 mt-0.5">
-              {western.symbol} {western.sign} × {chinese.emoji} {chinese.sign}
-            </p>
-          </div>
-          <div className="text-right">
-            <EnergyDots level={horo.energy} />
-            <p className="text-xs text-gray-400 mt-1">energia</p>
-          </div>
+      {/* Loading */}
+      {loading && (
+        <div className="bg-white rounded-2xl p-8 shadow-sm flex flex-col items-center gap-3 text-gray-400">
+          <RefreshCw size={24} className="animate-spin text-brand-400" />
+          <p className="text-sm">A gerar horóscopo com Claude…</p>
         </div>
-        {/* General */}
-        <p className="text-sm text-gray-700 leading-relaxed mb-3">{horo.geral}</p>
-        <div className="flex items-center gap-4 pt-3 border-t border-gray-50">
-          <div className="flex items-center gap-1.5">
-            <Star size={12} className="text-amber-400" />
-            <span className="text-xs text-gray-500">Número: <strong className="text-gray-700">{horo.luckyNumber}</strong></span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-full bg-brand-400 opacity-70" />
-            <span className="text-xs text-gray-500">Cor: <strong className="text-gray-700">{horo.luckyColour}</strong></span>
-          </div>
-        </div>
-      </div>
+      )}
 
-      {/* 4 area cards */}
-      <HoroCard icon={Heart}     label="Amor & Relações"  text={horo.amor}     color="pink"   />
-      <HoroCard icon={Activity}  label="Saúde & Energia"  text={horo.saude}    color="green"  />
-      <HoroCard icon={Briefcase} label="Trabalho & Carreira" text={horo.trabalho} color="blue" />
+      {/* Error */}
+      {error && (
+        <div className="bg-red-50 rounded-2xl p-4 shadow-sm">
+          <p className="text-sm text-red-600 mb-2">{error}</p>
+          <div className="flex gap-2">
+            <button onClick={() => load(period, true)}
+              className="text-xs text-red-500 font-medium border border-red-200 rounded-lg px-3 py-1.5">
+              Tentar novamente
+            </button>
+            <button onClick={() => { saveApiKey(''); setHasKey(false) }}
+              className="text-xs text-gray-400 font-medium border border-gray-200 rounded-lg px-3 py-1.5">
+              Alterar chave
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Result */}
+      {horo && !loading && (
+        <>
+          <div className="bg-white rounded-2xl p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">
+                  Horóscopo {periodLabel[period]}
+                </p>
+                <p className="text-sm font-semibold text-gray-800 mt-0.5">
+                  {western.symbol} {western.sign} × {chinese.emoji} {chinese.sign}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="text-right">
+                  <EnergyDots level={horo.energia ?? 3} />
+                  <p className="text-xs text-gray-400 mt-1">energia</p>
+                </div>
+                <button onClick={() => load(period, true)} title="Regenerar"
+                  className="text-gray-300 hover:text-brand-500 p-1 transition-colors">
+                  <RefreshCw size={14} />
+                </button>
+              </div>
+            </div>
+            {horo.frase && (
+              <p className="text-sm font-medium text-brand-700 italic mb-2 border-l-2 border-brand-300 pl-3">
+                "{horo.frase}"
+              </p>
+            )}
+            <p className="text-sm text-gray-700 leading-relaxed mb-3">{horo.geral}</p>
+            <div className="flex items-center gap-4 pt-3 border-t border-gray-50">
+              <div className="flex items-center gap-1.5">
+                <Star size={12} className="text-amber-400" />
+                <span className="text-xs text-gray-500">Número: <strong className="text-gray-700">{horo.numero}</strong></span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-full bg-brand-400 opacity-70" />
+                <span className="text-xs text-gray-500">Cor: <strong className="text-gray-700">{horo.cor}</strong></span>
+              </div>
+            </div>
+          </div>
+
+          <HoroCard icon={Heart}     label="Amor & Relações"     text={horo.amor}     color="pink"  />
+          <HoroCard icon={Activity}  label="Saúde & Energia"     text={horo.saude}    color="green" />
+          <HoroCard icon={Briefcase} label="Trabalho & Carreira" text={horo.trabalho} color="blue"  />
+
+          {/* Source note */}
+          <div className="bg-gray-50 rounded-2xl px-4 py-3 border border-gray-100">
+            <p className="text-[11px] text-gray-400 leading-relaxed">
+              <strong className="text-gray-500">Fonte:</strong> Horóscopo gerado pelo modelo Claude (Anthropic) com base nos teus signos e na data actual. As descrições dos signos seguem as tradições da astrologia ocidental e do zodíaco chinês clássico. Deve ser lido como reflexão pessoal, não como previsão.
+            </p>
+            <button onClick={() => { saveApiKey(''); setHasKey(false) }}
+              className="mt-1.5 text-[11px] text-gray-400 underline underline-offset-2">
+              Alterar chave API
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -377,7 +505,7 @@ export default function Profile() {
           {/* Combination card */}
           {insight && <CombinationCard western={zodiac} chinese={chinese} insight={insight} />}
           {/* Period horoscope */}
-          <HoroscopeSection western={zodiac} chinese={chinese} />
+          <HoroscopeSection western={zodiac} chinese={chinese} profile={profile} />
         </div>
       )}
 

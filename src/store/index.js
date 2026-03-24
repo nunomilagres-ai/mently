@@ -8,6 +8,7 @@ const KEYS = {
   nutrition: 'mently:nutrition',
   sleep:     'mently:sleep',
   exercise:  'mently:exercise',
+  horoCache: 'mently:horoCache',
 }
 
 function get(key) {
@@ -102,3 +103,33 @@ export const exerciseStore = {
 }
 
 export function genNewId() { return genId() }
+
+// ─── Horoscope cache ──────────────────────────────────────────────────────────
+// Key format: "{westernSign}-{chineseSign}-{period}-{dateKey}"
+// dateKey: dia=YYYY-MM-DD, semana=YYYY-Www, mes=YYYY-MM, ano=YYYY
+export const horoCache = {
+  _all: () => { try { return JSON.parse(localStorage.getItem(KEYS.horoCache)) ?? {} } catch { return {} } },
+  get: (key) => horoCache._all()[key] ?? null,
+  set: (key, value) => {
+    const all = horoCache._all()
+    all[key] = value
+    localStorage.setItem(KEYS.horoCache, JSON.stringify(all))
+  },
+  clear: () => localStorage.removeItem(KEYS.horoCache),
+}
+
+export function buildHoroCacheKey(westernSign, chineseSign, period) {
+  const now = new Date()
+  let dateKey
+  if (period === 'dia')    dateKey = now.toISOString().slice(0, 10)
+  if (period === 'semana') {
+    const d = new Date(now); d.setHours(0,0,0,0)
+    d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7))
+    const w = new Date(d.getFullYear(), 0, 4)
+    const week = 1 + Math.round(((d - w) / 86400000 - 3 + ((w.getDay() + 6) % 7)) / 7)
+    dateKey = `${now.getFullYear()}-W${String(week).padStart(2,'0')}`
+  }
+  if (period === 'mes')    dateKey = now.toISOString().slice(0, 7)
+  if (period === 'ano')    dateKey = String(now.getFullYear())
+  return `${westernSign}-${chineseSign}-${period}-${dateKey}`
+}
