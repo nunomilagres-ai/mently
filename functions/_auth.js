@@ -2,19 +2,30 @@
 
 export async function getAuthUser(request, env) {
   const cookieHeader = request.headers.get('Cookie') || '';
-  if (!cookieHeader.includes('session_id')) return null;
 
-  // Validar sessão via bynuno.com (cookie partilhado Domain=.bynuno.com)
-  let hubUser;
-  try {
-    const r = await fetch('https://bynuno.com/api/auth/me', {
-      headers: { Cookie: cookieHeader },
-    });
-    if (!r.ok) return null;
-    hubUser = await r.json();
-  } catch {
-    return null;
+  // Extrair todos os valores de session_id (pode haver duplicados: cookie local antigo
+  // do mently sem Domain= e o cookie partilhado Domain=.bynuno.com)
+  const sessionIds = [];
+  for (const part of cookieHeader.split(';')) {
+    const eqIdx = part.indexOf('=');
+    if (eqIdx < 0) continue;
+    const key = part.substring(0, eqIdx).trim();
+    const val = part.substring(eqIdx + 1).trim();
+    if (key === 'session_id' && val) sessionIds.push(val);
   }
+  if (sessionIds.length === 0) return null;
+
+  // Tentar cada session_id até um ser aceite pelo byNuno Hub
+  let hubUser;
+  for (const sid of sessionIds) {
+    try {
+      const r = await fetch('https://bynuno.com/api/auth/me', {
+        headers: { Cookie: `session_id=${sid}` },
+      });
+      if (r.ok) { hubUser = await r.json(); break; }
+    } catch {}
+  }
+  if (!hubUser) return null;
 
   // Garantir que o utilizador existe localmente (FK em entities)
   // Usa o user.id local existente para preservar dados já criados
