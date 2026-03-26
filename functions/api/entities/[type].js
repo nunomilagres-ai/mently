@@ -40,7 +40,7 @@ export async function onRequestPost({ request, env, params }) {
   const row  = { ...body, id };
 
   await env.DB.prepare(
-    'INSERT INTO entities (id, type, data, user_id, created_date, updated_date) VALUES (?, ?, ?, ?, ?, ?)'
+    'INSERT OR REPLACE INTO entities (id, type, data, user_id, created_date, updated_date) VALUES (?, ?, ?, ?, ?, ?)'
   ).bind(id, type, JSON.stringify(row), user.id, body.created_date || ts, ts).run();
 
   return json({ ...row, created_date: body.created_date || ts, updated_date: ts }, 201);

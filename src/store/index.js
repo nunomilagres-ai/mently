@@ -8,6 +8,7 @@ export {
   exerciseStore,
   genNewId,
   horoCache,
+  horoPersist,
   buildHoroCacheKey,
   getCurrentUser,
   logout,

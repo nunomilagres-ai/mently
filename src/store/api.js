@@ -132,7 +132,9 @@ export function genNewId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
-// ─── Horoscope cache (localStorage — é apenas cache de LLM, não dados do utilizador) ──
+// ─── Horoscope cache ──────────────────────────────────────────────────────────
+// localStorage: cache local rápido (mesmo dispositivo)
+// D1 via entities: cache persistente cross-device
 const HORO_KEY = 'mently:horoCache';
 export const horoCache = {
   _all: () => { try { return JSON.parse(localStorage.getItem(HORO_KEY)) ?? {} } catch { return {} } },
@@ -142,6 +144,27 @@ export const horoCache = {
     localStorage.setItem(HORO_KEY, JSON.stringify(all));
   },
   clear: () => localStorage.removeItem(HORO_KEY),
+};
+
+// Cache de horóscopos em D1 (por utilizador, cross-device)
+// Usa o cacheKey como ID da entidade para upsert directo
+export const horoPersist = {
+  async get(cacheKey) {
+    try {
+      const res = await apiFetch(`/api/entities/horoscope/${cacheKey}`);
+      if (!res.ok) return null;
+      const row = await res.json();
+      return row.result ?? null;
+    } catch { return null; }
+  },
+  async set(cacheKey, result) {
+    try {
+      await apiFetch('/api/entities/horoscope', {
+        method: 'POST',
+        body:   JSON.stringify({ id: cacheKey, result }),
+      });
+    } catch {}
+  },
 };
 
 export function buildHoroCacheKey(westernSign, chineseSign, period) {

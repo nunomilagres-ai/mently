@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { Ruler, Calendar, Clock, Sparkles, Star, Heart, Briefcase, Activity, RefreshCw, Key, Eye, EyeOff } from 'lucide-react'
-import { profileStore, weightStore, horoCache, buildHoroCacheKey } from '@/store'
+import { profileStore, weightStore, horoCache, horoPersist, buildHoroCacheKey } from '@/store'
 import { getZodiac, getChineseZodiac, getAge, getCombinationInsight } from '@/utils/horoscope'
 import { generateHoroscope, getApiKey, saveApiKey } from '@/utils/llm'
 import { cn } from '@/utils/cn'
@@ -173,13 +173,28 @@ function HoroscopeSection({ western, chinese, profile }) {
 
   async function load(p, force = false) {
     const cacheKey = buildHoroCacheKey(western.sign, chinese.sign, p)
+
     if (!force) {
-      const cached = horoCache.get(cacheKey)
-      if (cached) { setHoro(cached); return }
+      // 1. localStorage — rápido, mesmo dispositivo
+      const local = horoCache.get(cacheKey)
+      if (local) { setHoro(local); return }
+
+      // 2. D1 — cross-device, sem chamar Claude
+      setLoading(true)
+      setError(null)
+      const remote = await horoPersist.get(cacheKey)
+      if (remote) {
+        horoCache.set(cacheKey, remote)
+        setHoro(remote)
+        setLoading(false)
+        return
+      }
+    } else {
+      setLoading(true)
+      setError(null)
+      setHoro(null)
     }
-    setLoading(true)
-    setError(null)
-    setHoro(null)
+
     try {
       const result = await generateHoroscope({
         western, chinese, period: p,
@@ -188,6 +203,7 @@ function HoroscopeSection({ western, chinese, profile }) {
         sex: profile?.sex,
       })
       horoCache.set(cacheKey, result)
+      horoPersist.set(cacheKey, result)   // guardar em D1 (fire-and-forget)
       setHoro(result)
     } catch (e) {
       setError(e.message)
