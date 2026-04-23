@@ -7,5 +7,12 @@ binding       = "DB"
 database_name = "mently-db"
 database_id   = "269a3213-4328-4b9a-a13f-ee501f36006b"
 
+[[r2_buckets]]
+binding     = "FILES"
+bucket_name = "mently-files"
+
 [vars]
 APP_URL = "https://mently.bynuno.com"
+
+# Secrets (configurar via: wrangler secret put ANTHROPIC_API_KEY)
+# ANTHROPIC_API_KEY = "sk-ant-..."

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { pt } from 'date-fns/locale'
-import { Plus, ChevronLeft, ChevronRight, X, Trash2, UtensilsCrossed } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight, X, Trash2, UtensilsCrossed, Camera } from 'lucide-react'
 import { nutritionStore, profileStore, genNewId } from '@/store'
 import { getRecommendedNutrition } from '@/utils/horoscope'
 import { cn } from '@/utils/cn'
+import FoodPhotoRecognition from '@/components/nutrition/FoodPhotoRecognition'
 
 // ─── Progress bar ─────────────────────────────────────────────────────────────
 function NutrBar({ label, value, target, unit, color = 'brand' }) {
@@ -66,7 +67,23 @@ const EMPTY_FOOD = {
 
 function AddFoodModal({ mealName, onAdd, onClose }) {
   const [food, setFood] = useState(EMPTY_FOOD)
+  const [showPhotoRecognition, setShowPhotoRecognition] = useState(false)
   const f = (k, v) => setFood(p => ({ ...p, [k]: v }))
+
+  // Callback quando alimentos são detectados pela IA
+  function handleFoodDetected(foods) {
+    setShowPhotoRecognition(false)
+    
+    // Se apenas um alimento foi detectado, preencher o formulário
+    if (foods.length === 1) {
+      setFood(foods[0])
+    }
+    // Se múltiplos alimentos, adicionar todos automaticamente
+    else if (foods.length > 1) {
+      foods.forEach(detectedFood => onAdd(detectedFood))
+      onClose()
+    }
+  }
 
   const field = (label, key, placeholder = '', type = 'number') => (
     <div>
@@ -90,12 +107,29 @@ function AddFoodModal({ mealName, onAdd, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-end">
-      <div className="bg-white w-full rounded-t-3xl p-5 pb-8 max-h-[92vh] flex flex-col">
-        <div className="flex items-center justify-between mb-4 shrink-0">
-          <h3 className="font-bold text-gray-900">Adicionar alimento — {mealName}</h3>
-          <button onClick={onClose}><X size={20} className="text-gray-400" /></button>
-        </div>
+    <>
+      {showPhotoRecognition && (
+        <FoodPhotoRecognition
+          onFoodDetected={handleFoodDetected}
+          onClose={() => setShowPhotoRecognition(false)}
+        />
+      )}
+      
+      <div className="fixed inset-0 z-50 bg-black/50 flex items-end">
+        <div className="bg-white w-full rounded-t-3xl p-5 pb-8 max-h-[92vh] flex flex-col">
+          <div className="flex items-center justify-between mb-4 shrink-0">
+            <h3 className="font-bold text-gray-900">Adicionar alimento — {mealName}</h3>
+            <button onClick={onClose}><X size={20} className="text-gray-400" /></button>
+          </div>
+
+          {/* Botão de reconhecimento por foto */}
+          <button
+            onClick={() => setShowPhotoRecognition(true)}
+            className="w-full bg-brand-50 border-2 border-brand-200 rounded-xl p-3 mb-4 flex items-center justify-center gap-2 text-brand-600 hover:bg-brand-100 transition-colors"
+          >
+            <Camera size={18} />
+            <span className="font-semibold text-sm">Reconhecer com Foto</span>
+          </button>
         <div className="overflow-y-auto flex-1 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             {field('Nome', 'name', 'ex: Arroz cozido', 'text')}
@@ -142,8 +176,9 @@ function AddFoodModal({ mealName, onAdd, onClose }) {
         >
           Adicionar
         </button>
+        </div>
       </div>
-    </div>
+    </>
   )
 }
 
